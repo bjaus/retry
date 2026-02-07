@@ -14,18 +14,20 @@ func (immediateClock) Sleep(context.Context, time.Duration) error { return nil }
 
 func BenchmarkDo_ImmediateSuccess(b *testing.B) {
 	ctx := context.Background()
+	clockOpt := WithClock(immediateClock{})
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		Do(ctx, func(ctx context.Context) error {
 			return nil
-		}, WithClock(immediateClock{}))
+		}, clockOpt)
 	}
 }
 
 func BenchmarkDo_OneRetry(b *testing.B) {
 	ctx := context.Background()
 	errTest := errors.New("test")
+	clockOpt := WithClock(immediateClock{})
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -36,22 +38,20 @@ func BenchmarkDo_OneRetry(b *testing.B) {
 				return errTest
 			}
 			return nil
-		}, WithClock(immediateClock{}))
+		}, clockOpt)
 	}
 }
 
 func BenchmarkDo_Exhausted(b *testing.B) {
 	ctx := context.Background()
 	errTest := errors.New("test")
+	opts := []Option{WithMaxAttempts(3), WithClock(immediateClock{})}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		Do(ctx, func(ctx context.Context) error {
 			return errTest
-		},
-			WithMaxAttempts(3),
-			WithClock(immediateClock{}),
-		)
+		}, opts...)
 	}
 }
 

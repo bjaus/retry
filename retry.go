@@ -34,6 +34,12 @@ const (
 	DefaultMaxAttempts = 3
 )
 
+// package-level defaults to avoid allocation
+var (
+	defaultBackoff = Exponential(100 * time.Millisecond)
+	defaultClock   = realClock{}
+)
+
 // New creates a Policy with the given options.
 func New(opts ...Option) *Policy {
 	cfg := &config{
@@ -67,21 +73,21 @@ func Default() *Policy {
 
 // Do executes fn with retry using the default policy.
 func Do(ctx context.Context, fn Func, opts ...Option) error {
-	cfg := &config{
+	cfg := config{
 		maxAttempts: DefaultMaxAttempts,
-		backoff:     Exponential(100 * time.Millisecond),
-		clock:       realClock{},
+		backoff:     defaultBackoff,
+		clock:       defaultClock,
 		condition:   defaultCondition,
 	}
 	for _, opt := range opts {
-		opt(cfg)
+		opt(&cfg)
 	}
 	return execute(ctx, fn, cfg)
 }
 
 // Do executes fn with retry using this policy's configuration.
 func (p *Policy) Do(ctx context.Context, fn Func, opts ...Option) error {
-	cfg := &config{
+	cfg := config{
 		maxAttempts: p.maxAttempts,
 		maxDuration: p.maxDuration,
 		backoff:     p.backoff,
@@ -89,12 +95,13 @@ func (p *Policy) Do(ctx context.Context, fn Func, opts ...Option) error {
 		condition:   defaultCondition,
 	}
 	for _, opt := range opts {
-		opt(cfg)
+		opt(&cfg)
 	}
 	return execute(ctx, fn, cfg)
 }
 
-func execute(ctx context.Context, fn Func, cfg *config) error {
+func execute(ctx context.Context, fn Func, cfg config) error {
+	var lastErr error
 	var errs []error
 	var deadline time.Time
 
@@ -126,7 +133,7 @@ func execute(ctx context.Context, fn Func, cfg *config) error {
 		if cfg.allErrors {
 			errs = append(errs, err)
 		} else {
-			errs = []error{err}
+			lastErr = err
 		}
 
 		// Check if we've exhausted attempts
@@ -134,12 +141,18 @@ func execute(ctx context.Context, fn Func, cfg *config) error {
 			if cfg.onExhausted != nil {
 				cfg.onExhausted(ctx, attempt, err)
 			}
-			return joinErrors(errs)
+			if cfg.allErrors {
+				return joinErrors(errs)
+			}
+			return lastErr
 		}
 
 		// Check condition
 		if cfg.condition != nil && !cfg.condition(err) {
-			return joinErrors(errs)
+			if cfg.allErrors {
+				return joinErrors(errs)
+			}
+			return lastErr
 		}
 
 		// Check time budget
@@ -147,7 +160,10 @@ func execute(ctx context.Context, fn Func, cfg *config) error {
 			if cfg.onExhausted != nil {
 				cfg.onExhausted(ctx, attempt, err)
 			}
-			return joinErrors(errs)
+			if cfg.allErrors {
+				return joinErrors(errs)
+			}
+			return lastErr
 		}
 
 		// Calculate delay
@@ -163,7 +179,10 @@ func execute(ctx context.Context, fn Func, cfg *config) error {
 				if cfg.onExhausted != nil {
 					cfg.onExhausted(ctx, attempt, err)
 				}
-				return joinErrors(errs)
+				if cfg.allErrors {
+					return joinErrors(errs)
+				}
+				return lastErr
 			}
 		}
 
@@ -172,7 +191,10 @@ func execute(ctx context.Context, fn Func, cfg *config) error {
 		}
 
 		if err := cfg.clock.Sleep(ctx, delay); err != nil {
-			return joinErrors(errs)
+			if cfg.allErrors {
+				return joinErrors(errs)
+			}
+			return lastErr
 		}
 	}
 }
