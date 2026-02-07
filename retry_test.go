@@ -47,7 +47,6 @@ func TestDo(t *testing.T) {
 			attempts++
 			return nil
 		}, retry.WithClock(newFakeClock()))
-
 		if err != nil {
 			t.Fatalf("expected nil error, got %v", err)
 		}
@@ -65,7 +64,6 @@ func TestDo(t *testing.T) {
 			}
 			return nil
 		}, retry.WithClock(newFakeClock()))
-
 		if err != nil {
 			t.Fatalf("expected nil error, got %v", err)
 		}
@@ -211,17 +209,23 @@ func TestPolicy(t *testing.T) {
 
 		// First call
 		attempts1 := 0
-		_ = policy.Do(context.Background(), func(ctx context.Context) error {
+		err := policy.Do(context.Background(), func(ctx context.Context) error {
 			attempts1++
 			return errTest
 		})
+		if !errors.Is(err, errTest) {
+			t.Fatalf("expected errTest, got %v", err)
+		}
 
 		// Second call
 		attempts2 := 0
-		_ = policy.Do(context.Background(), func(ctx context.Context) error {
+		err = policy.Do(context.Background(), func(ctx context.Context) error {
 			attempts2++
 			return errTest
 		})
+		if !errors.Is(err, errTest) {
+			t.Fatalf("expected errTest, got %v", err)
+		}
 
 		if attempts1 != 2 {
 			t.Fatalf("expected 2 attempts for first call, got %d", attempts1)
@@ -287,7 +291,6 @@ func TestHooks(t *testing.T) {
 				successAttempts = a
 			}),
 		)
-
 		if err != nil {
 			t.Fatalf("expected nil error, got %v", err)
 		}
@@ -473,11 +476,14 @@ func TestDefault(t *testing.T) {
 		clock := newFakeClock()
 
 		attempts := 0
-		_ = policy.Do(context.Background(), func(ctx context.Context) error {
+		err := policy.Do(context.Background(), func(ctx context.Context) error {
 			attempts++
 			return errTest
 		}, retry.WithClock(clock))
 
+		if !errors.Is(err, errTest) {
+			t.Fatalf("expected errTest, got %v", err)
+		}
 		if attempts != 3 {
 			t.Fatalf("expected 3 attempts (default), got %d", attempts)
 		}
@@ -490,7 +496,7 @@ func TestMaxDurationEdgeCases(t *testing.T) {
 		attempts := 0
 		var exhaustedCalled bool
 
-		_ = retry.Do(context.Background(), func(ctx context.Context) error {
+		err := retry.Do(context.Background(), func(ctx context.Context) error {
 			attempts++
 			// Advance clock so remaining time is less than backoff delay
 			clock.Advance(90 * time.Millisecond)
@@ -505,6 +511,9 @@ func TestMaxDurationEdgeCases(t *testing.T) {
 			}),
 		)
 
+		if !errors.Is(err, errTest) {
+			t.Fatalf("expected errTest, got %v", err)
+		}
 		if !exhaustedCalled {
 			t.Fatal("expected OnExhausted to be called")
 		}
@@ -514,7 +523,7 @@ func TestMaxDurationEdgeCases(t *testing.T) {
 		clock := newFakeClock()
 		var delays []time.Duration
 
-		_ = retry.Do(context.Background(), func(ctx context.Context) error {
+		err := retry.Do(context.Background(), func(ctx context.Context) error {
 			clock.Advance(80 * time.Millisecond)
 			return errTest
 		},
@@ -527,6 +536,9 @@ func TestMaxDurationEdgeCases(t *testing.T) {
 			}),
 		)
 
+		if !errors.Is(err, errTest) {
+			t.Fatalf("expected errTest, got %v", err)
+		}
 		// First retry should have delay capped to remaining budget (20ms)
 		if len(delays) > 0 && delays[0] > 20*time.Millisecond {
 			t.Fatalf("expected delay to be capped, got %v", delays[0])
@@ -537,7 +549,7 @@ func TestMaxDurationEdgeCases(t *testing.T) {
 		clock := newFakeClock()
 		attempts := 0
 
-		_ = retry.Do(context.Background(), func(ctx context.Context) error {
+		err := retry.Do(context.Background(), func(ctx context.Context) error {
 			attempts++
 			clock.Advance(100 * time.Millisecond)
 			return errTest
@@ -548,6 +560,9 @@ func TestMaxDurationEdgeCases(t *testing.T) {
 			retry.WithClock(clock),
 		)
 
+		if !errors.Is(err, errTest) {
+			t.Fatalf("expected errTest, got %v", err)
+		}
 		if attempts != 1 {
 			t.Fatalf("expected 1 attempt, got %d", attempts)
 		}
@@ -558,7 +573,7 @@ func TestMaxDurationEdgeCases(t *testing.T) {
 		var exhaustedCalled bool
 		var exhaustedAttempts int
 
-		_ = retry.Do(context.Background(), func(ctx context.Context) error {
+		err := retry.Do(context.Background(), func(ctx context.Context) error {
 			// Advance exactly to the deadline so remaining = 0
 			// After(deadline) is false when Now() == deadline
 			// but remaining = deadline - Now() = 0
@@ -575,6 +590,9 @@ func TestMaxDurationEdgeCases(t *testing.T) {
 			}),
 		)
 
+		if !errors.Is(err, errTest) {
+			t.Fatalf("expected errTest, got %v", err)
+		}
 		if !exhaustedCalled {
 			t.Fatal("expected OnExhausted to be called")
 		}
@@ -587,7 +605,7 @@ func TestMaxDurationEdgeCases(t *testing.T) {
 func TestZeroMaxAttempts(t *testing.T) {
 	t.Run("zero max attempts uses default", func(t *testing.T) {
 		attempts := 0
-		_ = retry.Do(context.Background(), func(ctx context.Context) error {
+		err := retry.Do(context.Background(), func(ctx context.Context) error {
 			attempts++
 			return errTest
 		},
@@ -595,6 +613,9 @@ func TestZeroMaxAttempts(t *testing.T) {
 			retry.WithClock(newFakeClock()),
 		)
 
+		if !errors.Is(err, errTest) {
+			t.Fatalf("expected errTest, got %v", err)
+		}
 		if attempts != 3 {
 			t.Fatalf("expected 3 attempts (default), got %d", attempts)
 		}
@@ -641,7 +662,7 @@ func TestRealClock(t *testing.T) {
 		}()
 
 		start := time.Now()
-		_ = retry.Do(ctx, func(ctx context.Context) error {
+		err := retry.Do(ctx, func(ctx context.Context) error {
 			attempts++
 			return errTest
 		},
@@ -649,6 +670,10 @@ func TestRealClock(t *testing.T) {
 			retry.WithBackoff(retry.Constant(1*time.Second)), // Long sleep
 		)
 		elapsed := time.Since(start)
+
+		if !errors.Is(err, errTest) {
+			t.Fatalf("expected errTest, got %v", err)
+		}
 
 		// Should have been cancelled during sleep, not waited full 1s
 		if elapsed > 500*time.Millisecond {
@@ -660,7 +685,7 @@ func TestRealClock(t *testing.T) {
 		attempts := 0
 		start := time.Now()
 
-		_ = retry.Do(context.Background(), func(ctx context.Context) error {
+		err := retry.Do(context.Background(), func(ctx context.Context) error {
 			attempts++
 			return errTest
 		},
@@ -671,6 +696,9 @@ func TestRealClock(t *testing.T) {
 
 		elapsed := time.Since(start)
 
+		if !errors.Is(err, errTest) {
+			t.Fatalf("expected errTest, got %v", err)
+		}
 		// Should have stopped within ~50ms due to max duration
 		if elapsed > 200*time.Millisecond {
 			t.Fatalf("expected to stop within max duration, took %v", elapsed)
