@@ -117,6 +117,52 @@ func ExampleIf() {
 	// Attempts: 3
 }
 
+// ExampleIfNot demonstrates skipping specific errors from retry.
+func ExampleIfNot() {
+	validationErr := errors.New("validation error")
+
+	attempts := 0
+	err := retry.Do(context.Background(), func(ctx context.Context) error {
+		attempts++
+		if attempts == 2 {
+			return validationErr // Don't retry this
+		}
+		return errors.New("transient")
+	},
+		retry.WithMaxAttempts(10),
+		retry.WithBackoff(retry.Constant(time.Millisecond)),
+		retry.IfNot(func(err error) bool {
+			return errors.Is(err, validationErr)
+		}),
+	)
+
+	fmt.Println("Error:", err)
+	fmt.Println("Attempts:", attempts)
+
+	// Output:
+	// Error: validation error
+	// Attempts: 2
+}
+
+// ExampleNot demonstrates inverting a condition.
+func ExampleNot() {
+	isTimeout := func(err error) bool {
+		return err.Error() == "timeout"
+	}
+
+	// Retry everything EXCEPT timeouts
+	notTimeout := retry.Not(isTimeout)
+
+	fmt.Println("timeout matches:", isTimeout(errors.New("timeout")))
+	fmt.Println("timeout matches Not:", notTimeout(errors.New("timeout")))
+	fmt.Println("other matches Not:", notTimeout(errors.New("other")))
+
+	// Output:
+	// timeout matches: true
+	// timeout matches Not: false
+	// other matches Not: true
+}
+
 // ExampleOnRetry demonstrates the retry hook for logging.
 func ExampleOnRetry() {
 	attempts := 0

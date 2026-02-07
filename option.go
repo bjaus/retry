@@ -58,6 +58,19 @@ func If(cond Condition) Option {
 	}
 }
 
+// IfNot sets a condition where matching errors are NOT retried.
+// This is equivalent to If(Not(cond)).
+func IfNot(cond Condition) Option {
+	return If(Not(cond))
+}
+
+// Not inverts a condition.
+func Not(cond Condition) Condition {
+	return func(err error) bool {
+		return !cond(err)
+	}
+}
+
 // OnRetry sets a hook that is called before each retry sleep.
 func OnRetry(fn OnRetryFunc) Option {
 	return func(c *config) {

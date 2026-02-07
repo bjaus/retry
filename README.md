@@ -226,7 +226,9 @@ func TestRetry(t *testing.T) {
 
 | Option | Description |
 |--------|-------------|
-| `If(cond)` | Condition to determine if error should be retried |
+| `If(cond)` | Retry if condition returns true |
+| `IfNot(cond)` | Skip retry if condition returns true |
+| `Not(cond)` | Inverts a condition (helper for composing) |
 | `OnRetry(fn)` | Hook called before each retry sleep |
 | `OnSuccess(fn)` | Hook called when function succeeds |
 | `OnExhausted(fn)` | Hook called when all attempts exhausted |

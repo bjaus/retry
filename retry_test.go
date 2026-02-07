@@ -158,6 +158,47 @@ func TestDo(t *testing.T) {
 			t.Fatalf("expected 2 attempts, got %d", attempts)
 		}
 	})
+
+	t.Run("IfNot skips matching errors", func(t *testing.T) {
+		attempts := 0
+		skipThis := errors.New("skip this error")
+
+		err := retry.Do(context.Background(), func(ctx context.Context) error {
+			attempts++
+			if attempts == 2 {
+				return skipThis
+			}
+			return errTest
+		},
+			retry.WithMaxAttempts(10),
+			retry.WithClock(newFakeClock()),
+			retry.IfNot(func(err error) bool {
+				return errors.Is(err, skipThis)
+			}),
+		)
+
+		if !errors.Is(err, skipThis) {
+			t.Fatalf("expected skipThis, got %v", err)
+		}
+		if attempts != 2 {
+			t.Fatalf("expected 2 attempts, got %d", attempts)
+		}
+	})
+
+	t.Run("Not inverts condition", func(t *testing.T) {
+		alwaysTrue := func(err error) bool { return true }
+		alwaysFalse := func(err error) bool { return false }
+
+		inverted := retry.Not(alwaysTrue)
+		if inverted(errTest) != false {
+			t.Fatal("expected Not(alwaysTrue) to return false")
+		}
+
+		inverted = retry.Not(alwaysFalse)
+		if inverted(errTest) != true {
+			t.Fatal("expected Not(alwaysFalse) to return true")
+		}
+	})
 }
 
 func TestPolicy(t *testing.T) {
