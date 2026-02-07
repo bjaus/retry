@@ -23,7 +23,7 @@ Flexible, composable retry logic for Go with dependency injection support.
 go get github.com/bjaus/retry
 ```
 
-Requires Go 1.23 or later.
+Requires Go 1.25 or later.
 
 ## Quick Start
 
